@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # Servicio de la Base de Datos PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: library_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: libraryDb1234*
+      POSTGRES_DB: library_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Servicio del Backend NestJS
+  backend:
+    build: .
+    container_name: library_backend
+    restart: always
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      DATABASE_URL: 'postgresql://admin:libraryDb1234*@postgres:5432/library_db?schema=public'
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
