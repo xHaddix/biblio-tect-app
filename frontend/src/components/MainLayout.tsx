@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -15,8 +15,17 @@ interface MainLayoutProps {
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Inicializamos el estado leyendo el valor persistido en localStorage
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('sidebar_collapsed') === 'true';
+  });
+
   const navigate = useNavigate();
+
+  // Guardamos cada cambio en localStorage
+  useEffect(() => {
+    localStorage.setItem('sidebar_collapsed', String(isCollapsed));
+  }, [isCollapsed]);
 
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
@@ -41,7 +50,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       >
         {/* Botón Flotante para Colapsar/Expandir */}
         <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={() => setIsCollapsed((prev) => !prev)}
           className="absolute -right-3.5 top-7 z-50 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-brand-dark text-white shadow-md transition-transform hover:scale-110 active:scale-95"
           aria-label={isCollapsed ? 'Expandir barra' : 'Colapsar barra'}
         >
@@ -53,7 +62,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         </button>
 
         <div>
-          {/* Header del Sidebar / Logotipo */}
+          {/* Header del Sidebar */}
           <div className="flex items-center gap-3 px-2 py-4">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-accent text-white shadow-md">
               <BookOpen className="h-6 w-6" />
@@ -65,7 +74,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             )}
           </div>
 
-          {/* Menú de Navegación */}
+          {/* Navegación */}
           <nav className="mt-8 space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -94,7 +103,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </nav>
         </div>
 
-        {/* Botón de Cerrar Sesión */}
+        {/* Cerrar Sesión */}
         <div className="border-t border-white/10 pt-4">
           <button
             onClick={handleLogout}
