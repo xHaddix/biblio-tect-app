@@ -83,3 +83,11 @@ export interface UpdateUserDto {
   role?: Role;
   status?: number;
 }
+
+export interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}

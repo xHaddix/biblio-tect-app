@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { MainLayout } from '../components/MainLayout';
 import {
   Plus,
@@ -14,8 +16,11 @@ import {
   ArrowRight,
   Sparkles,
   User as UserIcon,
+  ChevronDown,
+  Check,
+  Filter,
 } from 'lucide-react';
-import type { Loan, User, Book } from '../types';
+import type { Loan, User, Book, Category } from '../types';
 import { loansApi } from '../api/loans';
 import { usersApi } from '../api/users';
 import { booksApi } from '../api/books';
@@ -25,9 +30,10 @@ export const Loans = () => {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filtros
+  // Filtros de la lista principal
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<
     'ALL' | 'ACTIVE' | 'RETURNED'
@@ -39,17 +45,32 @@ export const Loans = () => {
   const [selectedBook, setSelectedBook] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Estados para Custom Selects y sus Búsquedas Internas
+  const [isUserOpen, setIsUserOpen] = useState(false);
+  const [isBookOpen, setIsBookOpen] = useState(false);
+
+  const [userSearch, setUserSearch] = useState('');
+  const [bookSearch, setBookSearch] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] =
+    useState<string>('ALL');
+
+  const userDropdownRef = useRef<HTMLDivElement>(null);
+  const bookDropdownRef = useRef<HTMLDivElement>(null);
+
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [loansData, usersData, booksData] = await Promise.all([
-        loansApi.getAll(),
-        usersApi.getAll(),
-        booksApi.getAll(),
-      ]);
+      const [loansData, usersData, booksData, categoriesData] =
+        await Promise.all([
+          loansApi.getAll(),
+          usersApi.getAll(),
+          booksApi.getAll(),
+          booksApi.getCategories(),
+        ]);
       setLoans(loansData);
       setUsers(usersData);
       setBooks(booksData.filter((b) => b.availableCopies > 0));
+      setCategories(categoriesData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -61,8 +82,47 @@ export const Loans = () => {
     void fetchData();
   }, []);
 
+  // Cerrar dropdowns al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        userDropdownRef.current &&
+        !userDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsUserOpen(false);
+      }
+      if (
+        bookDropdownRef.current &&
+        !bookDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsBookOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const selectedBookObj = books.find((b) => b.id === selectedBook);
   const selectedUserObj = users.find((u) => u.id === selectedUser);
+
+  // Filtrado dinámico dentro del desplegable de Usuarios
+  const filteredUsersOptions = users.filter(
+    (u) =>
+      u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(userSearch.toLowerCase()),
+  );
+
+  // Filtrado dinámico dentro del desplegable de Libros (Categoría + Nombre/Autor)
+  const filteredBooksOptions = books.filter((b) => {
+    const matchesCategory =
+      selectedCategoryFilter === 'ALL' ||
+      b.categoryId === selectedCategoryFilter;
+    const matchesSearch =
+      b.title.toLowerCase().includes(bookSearch.toLowerCase()) ||
+      b.author.toLowerCase().includes(bookSearch.toLowerCase());
+
+    return matchesCategory && matchesSearch;
+  });
 
   const handleCreateLoan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,11 +152,11 @@ export const Loans = () => {
     }
   };
 
-  // Cálculos de KPI
+  // KPIs
   const activeLoansCount = loans.filter((l) => !l.returnDate).length;
   const returnedLoansCount = loans.filter((l) => l.returnDate).length;
 
-  // Filtrado de lista
+  // Filtrado de lista principal
   const filteredLoans = loans.filter((loan) => {
     const userName = (loan.user?.name || '').toLowerCase();
     const bookTitle = (loan.book?.title || '').toLowerCase();
@@ -138,7 +198,7 @@ export const Loans = () => {
           </button>
         </div>
 
-        {/* Tarjetas de Estadísticas (KPIs) */}
+        {/* Tarjetas KPI */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md">
             <div className="flex items-center justify-between">
@@ -209,44 +269,239 @@ export const Loans = () => {
 
             <form onSubmit={handleCreateLoan} className="space-y-6">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {/* Selector de Usuario */}
-                <div>
+                {/* Custom Select - USUARIO CON BUSCADOR */}
+                <div className="relative" ref={userDropdownRef}>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
                     Usuario solicitante
                   </label>
-                  <select
-                    required
-                    value={selectedUser}
-                    onChange={(e) => setSelectedUser(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 shadow-sm transition-all focus:border-brand-accent focus:outline-none focus:ring-4 focus:ring-brand-accent/15"
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserOpen(!isUserOpen);
+                      setIsBookOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-xl border bg-white p-3 text-sm transition-all ${
+                      isUserOpen
+                        ? 'border-brand-accent ring-4 ring-brand-accent/15'
+                        : 'border-slate-300 hover:border-slate-400'
+                    }`}
                   >
-                    <option value="">Selecciona un usuario...</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.email})
-                      </option>
-                    ))}
-                  </select>
+                    <span
+                      className={
+                        selectedUserObj
+                          ? 'font-semibold text-slate-900'
+                          : 'text-slate-400'
+                      }
+                    >
+                      {selectedUserObj
+                        ? `${selectedUserObj.name} (${selectedUserObj.email})`
+                        : 'Selecciona un usuario...'}
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isUserOpen ? 'rotate-180 text-brand-accent' : ''}`}
+                    />
+                  </button>
+
+                  {isUserOpen && (
+                    <div className="absolute left-0 top-full z-50 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2.5 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="relative mb-2">
+                        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={userSearch}
+                          onChange={(e) => setUserSearch(e.target.value)}
+                          placeholder="Buscar usuario por nombre o correo..."
+                          className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-xs text-slate-900 focus:border-brand-accent focus:outline-none"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="max-h-52 overflow-y-auto space-y-1">
+                        {filteredUsersOptions.length === 0 ? (
+                          <p className="p-3 text-center text-xs text-slate-400">
+                            No se encontraron usuarios
+                          </p>
+                        ) : (
+                          filteredUsersOptions.map((u) => (
+                            <button
+                              key={u.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedUser(u.id);
+                                setIsUserOpen(false);
+                              }}
+                              className={`flex w-full items-center justify-between rounded-lg p-2.5 text-left text-xs transition-colors ${
+                                selectedUser === u.id
+                                  ? 'bg-brand-accent/10 font-bold text-brand-accent'
+                                  : 'hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              <div>
+                                <p className="font-semibold text-slate-900">
+                                  {u.name}
+                                </p>
+                                <p className="text-[11px] text-slate-400">
+                                  {u.email}
+                                </p>
+                              </div>
+                              {selectedUser === u.id && (
+                                <Check className="h-4 w-4 text-brand-accent" />
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Selector de Libro */}
-                <div>
+                {/* Custom Select - LIBRO CON BUSCADOR Y FILTRO DE CATEGORÍAS */}
+                <div className="relative" ref={bookDropdownRef}>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
                     Libro disponible
                   </label>
-                  <select
-                    required
-                    value={selectedBook}
-                    onChange={(e) => setSelectedBook(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 shadow-sm transition-all focus:border-brand-accent focus:outline-none focus:ring-4 focus:ring-brand-accent/15"
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBookOpen(!isBookOpen);
+                      setIsUserOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-xl border bg-white p-2.5 text-sm transition-all ${
+                      isBookOpen
+                        ? 'border-brand-accent ring-4 ring-brand-accent/15'
+                        : 'border-slate-300 hover:border-slate-400'
+                    }`}
                   >
-                    <option value="">Selecciona un libro...</option>
-                    {books.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.title} — {b.author} ({b.availableCopies} disp.)
-                      </option>
-                    ))}
-                  </select>
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      {selectedBookObj && (
+                        <div className="h-8 w-6 flex-shrink-0 overflow-hidden rounded border border-slate-200 bg-slate-100 flex items-center justify-center">
+                          {selectedBookObj.imageUrl ? (
+                            <img
+                              src={selectedBookObj.imageUrl}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <BookOpen className="h-3 w-3 text-slate-400" />
+                          )}
+                        </div>
+                      )}
+                      <span
+                        className={
+                          selectedBookObj
+                            ? 'font-semibold text-slate-900 truncate'
+                            : 'text-slate-400'
+                        }
+                      >
+                        {selectedBookObj
+                          ? `${selectedBookObj.title} — ${selectedBookObj.author}`
+                          : 'Selecciona un libro...'}
+                      </span>
+                    </div>
+                    <ChevronDown
+                      className={`h-4 w-4 text-slate-400 shrink-0 transition-transform duration-200 ${isBookOpen ? 'rotate-180 text-brand-accent' : ''}`}
+                    />
+                  </button>
+
+                  {isBookOpen && (
+                    <div className="absolute left-0 top-full z-50 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+                      {/* Buscador de Libro */}
+                      <div className="relative mb-3">
+                        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={bookSearch}
+                          onChange={(e) => setBookSearch(e.target.value)}
+                          placeholder="Buscar por título o autor..."
+                          className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-xs text-slate-900 focus:border-brand-accent focus:outline-none"
+                          autoFocus
+                        />
+                      </div>
+
+                      {/* Filtro por Categoría (Chips) */}
+                      <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1.5 text-[11px] no-scrollbar">
+                        <span className="flex items-center gap-1 text-slate-400 font-medium pr-1">
+                          <Filter className="h-3 w-3" /> Categoría:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCategoryFilter('ALL')}
+                          className={`rounded-full px-2.5 py-1 font-semibold whitespace-nowrap transition-colors ${
+                            selectedCategoryFilter === 'ALL'
+                              ? 'bg-brand-accent text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          Todas
+                        </button>
+                        {categories.map((cat) => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setSelectedCategoryFilter(cat.id)}
+                            className={`rounded-full px-2.5 py-1 font-semibold whitespace-nowrap transition-colors ${
+                              selectedCategoryFilter === cat.id
+                                ? 'bg-brand-accent text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {cat.name}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Lista de Opciones */}
+                      <div className="max-h-52 overflow-y-auto space-y-1">
+                        {filteredBooksOptions.length === 0 ? (
+                          <p className="p-3 text-center text-xs text-slate-400">
+                            No se encontraron libros disponibles
+                          </p>
+                        ) : (
+                          filteredBooksOptions.map((b) => (
+                            <button
+                              key={b.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedBook(b.id);
+                                setIsBookOpen(false);
+                              }}
+                              className={`flex w-full items-center justify-between rounded-lg p-2 text-left text-xs transition-colors ${
+                                selectedBook === b.id
+                                  ? 'bg-brand-accent/10 font-bold text-brand-accent'
+                                  : 'hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                <div className="h-10 w-7 flex-shrink-0 overflow-hidden rounded border border-slate-200 bg-slate-100 flex items-center justify-center">
+                                  {b.imageUrl ? (
+                                    <img
+                                      src={b.imageUrl}
+                                      alt={b.title}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <BookOpen className="h-3.5 w-3.5 text-slate-400" />
+                                  )}
+                                </div>
+                                <div className="truncate">
+                                  <p className="font-semibold truncate text-slate-900">
+                                    {b.title}
+                                  </p>
+                                  <p className="text-[11px] text-slate-400 truncate">
+                                    {b.author} • ({b.availableCopies} disp.)
+                                  </p>
+                                </div>
+                              </div>
+                              {selectedBook === b.id && (
+                                <Check className="h-4 w-4 shrink-0 text-brand-accent ml-2" />
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -256,7 +511,6 @@ export const Loans = () => {
                   Resumen de la transacción
                 </p>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  {/* Detalles del Libro */}
                   <div className="flex items-center gap-4">
                     <div className="h-16 w-12 flex-shrink-0 overflow-hidden rounded-lg border border-slate-300 bg-slate-200 shadow-sm flex items-center justify-center">
                       {selectedBookObj?.imageUrl ? (
@@ -281,7 +535,6 @@ export const Loans = () => {
 
                   <ArrowRight className="hidden h-5 w-5 text-slate-400 sm:block" />
 
-                  {/* Detalles del Usuario */}
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-accent/10 text-brand-accent font-bold text-sm">
                       {selectedUserObj?.name ? (
@@ -330,7 +583,7 @@ export const Loans = () => {
           </div>
         )}
 
-        {/* Controles de Búsqueda y Filtros */}
+        {/* Controles de Búsqueda y Filtros de la Lista */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -343,7 +596,6 @@ export const Loans = () => {
             />
           </div>
 
-          {/* Tabs de Filtro de Estado */}
           <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-medium text-slate-600">
             <button
               onClick={() => setFilterStatus('ALL')}
@@ -413,7 +665,6 @@ export const Loans = () => {
                       key={loan.id}
                       className="group transition-colors hover:bg-slate-50/60"
                     >
-                      {/* Usuario */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700 font-bold text-xs group-hover:bg-brand-accent/10 group-hover:text-brand-accent transition-colors">
@@ -434,7 +685,6 @@ export const Loans = () => {
                         </div>
                       </td>
 
-                      {/* Libro */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-8 flex-shrink-0 overflow-hidden rounded bg-slate-200 border border-slate-300 flex items-center justify-center">
@@ -459,7 +709,6 @@ export const Loans = () => {
                         </div>
                       </td>
 
-                      {/* Fecha */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 text-xs text-slate-600">
                           <Calendar className="h-3.5 w-3.5 text-slate-400" />
@@ -476,7 +725,6 @@ export const Loans = () => {
                         </div>
                       </td>
 
-                      {/* Estado Badge */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
@@ -492,7 +740,6 @@ export const Loans = () => {
                         </span>
                       </td>
 
-                      {/* Botón de Acción */}
                       <td className="px-6 py-4 text-right whitespace-nowrap">
                         {!loan.returnDate ? (
                           <button
