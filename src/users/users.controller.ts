@@ -25,7 +25,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.CLIENT)
   @ApiOperation({
     summary: 'Crear un usuario',
     description: 'Crea un nuevo usuario. Requiere rol ADMIN.',
@@ -35,7 +35,7 @@ export class UsersController {
   }
 
   @Get()
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.CLIENT)
   @ApiOperation({
     summary: 'Listar usuarios',
     description:
@@ -46,7 +46,7 @@ export class UsersController {
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.CLIENT)
   @ApiOperation({
     summary: 'Obtener un usuario por id',
     description: 'Retorna un usuario activo por su id. Requiere rol ADMIN.',
@@ -56,7 +56,7 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.CLIENT)
   @ApiOperation({
     summary: 'Actualizar un usuario',
     description:
@@ -67,7 +67,7 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.CLIENT)
   @ApiOperation({
     summary: 'Eliminar un usuario (soft delete)',
     description:

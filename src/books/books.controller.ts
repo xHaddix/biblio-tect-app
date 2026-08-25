@@ -100,7 +100,7 @@ export class BooksController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.CLIENT)
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: bookImageBodySchema })
@@ -116,7 +116,7 @@ export class BooksController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.CLIENT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Eliminar un libro (soft delete)' })
   remove(@Param('id') id: string) {
@@ -125,7 +125,7 @@ export class BooksController {
 
   @Delete(':id/image')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.CLIENT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Eliminar la imagen de un libro' })
   removeImage(@Param('id') id: string) {
