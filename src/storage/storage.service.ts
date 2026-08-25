@@ -1,9 +1,8 @@
+/* eslint-disable @typescript-eslint/require-await */
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
-  CreateBucketCommand,
   DeleteObjectCommand,
   GetObjectCommand,
-  HeadBucketCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -14,13 +13,7 @@ const PRESIGNED_URL_EXPIRES_IN_SECONDS = 60 * 60; // 1 hora
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
-  /** Cliente interno: usa el hostname de la red de Docker (ej. "minio") para subir/borrar archivos. */
   private readonly client: S3Client;
-  /**
-   * Cliente público: usa un endpoint accesible desde fuera de la red de Docker
-   * (ej. "localhost:9000" o un dominio público) exclusivamente para generar URLs firmadas
-   * que consumirán navegadores/clientes externos.
-   */
   private readonly publicClient: S3Client;
   private readonly bucket: string;
 
@@ -33,45 +26,54 @@ export class StorageService implements OnModuleInit {
       secretAccessKey: process.env.MINIO_SECRET_KEY ?? '',
     };
 
+    // Si el puerto es 443 u 80, no lo agregamos a la URL para evitar problemas de formato
+    const port = process.env.MINIO_PORT;
+    const portSuffix =
+      port && port !== '443' && port !== '80' ? `:${port}` : '';
+
+    // Si la URL ya incluye /storage/v1/s3 (Supabase) no agregamos subrutas extra
+    const endpointHost = process.env.MINIO_ENDPOINT ?? 'localhost';
+    const endpointUrl =
+      endpointHost.includes('supabase.co') &&
+      !endpointHost.includes('/storage/v1/s3')
+        ? `${useSsl ? 'https' : 'http'}://${endpointHost}${portSuffix}/storage/v1/s3`
+        : `${useSsl ? 'https' : 'http'}://${endpointHost}${portSuffix}`;
+
+    const publicHost = process.env.MINIO_PUBLIC_ENDPOINT ?? endpointHost;
+    const publicPort = process.env.MINIO_PUBLIC_PORT ?? port;
+    const publicPortSuffix =
+      publicPort && publicPort !== '443' && publicPort !== '80'
+        ? `:${publicPort}`
+        : '';
+
+    const publicEndpointUrl =
+      publicHost.includes('supabase.co') &&
+      !publicHost.includes('/storage/v1/s3')
+        ? `${useSsl ? 'https' : 'http'}://${publicHost}${publicPortSuffix}/storage/v1/s3`
+        : `${useSsl ? 'https' : 'http'}://${publicHost}${publicPortSuffix}`;
+
+    const region = process.env.AWS_REGION ?? 'us-east-2';
+
     this.client = new S3Client({
-      endpoint: `${useSsl ? 'https' : 'http'}://${process.env.MINIO_ENDPOINT}:${process.env.MINIO_PORT}`,
-      region: 'us-east-1',
+      endpoint: endpointUrl,
+      region,
       credentials,
-      forcePathStyle: true, // Requerido por MinIO
+      forcePathStyle: true,
     });
 
-    const publicEndpoint =
-      process.env.MINIO_PUBLIC_ENDPOINT ?? process.env.MINIO_ENDPOINT;
-    const publicPort = process.env.MINIO_PUBLIC_PORT ?? process.env.MINIO_PORT;
-
     this.publicClient = new S3Client({
-      endpoint: `${useSsl ? 'https' : 'http'}://${publicEndpoint}:${publicPort}`,
-      region: 'us-east-1',
+      endpoint: publicEndpointUrl,
+      region,
       credentials,
       forcePathStyle: true,
     });
   }
 
   async onModuleInit() {
-    await this.ensureBucketExists();
-  }
-
-  private async ensureBucketExists() {
-    try {
-      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
-    } catch {
-      try {
-        await this.client.send(
-          new CreateBucketCommand({ Bucket: this.bucket }),
-        );
-        this.logger.log(`Bucket "${this.bucket}" creado correctamente`);
-      } catch (error) {
-        this.logger.error(
-          `No se pudo crear/verificar el bucket "${this.bucket}"`,
-          error instanceof Error ? error.stack : undefined,
-        );
-      }
-    }
+    // Comentamos la creación automática ya que el bucket "books-images" existe en Supabase
+    this.logger.log(
+      `StorageService inicializado para el bucket "${this.bucket}"`,
+    );
   }
 
   async uploadFile(
