@@ -25,7 +25,7 @@ export class CreateUserDto {
   @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
   password!: string;
 
-  @ApiPropertyOptional({ enum: Role, example: Role.CLIENT })
+  @ApiPropertyOptional({ enum: Role, example: Role.ADMIN })
   @IsOptional()
   @IsEnum(Role)
   role?: Role;
