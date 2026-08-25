@@ -4,33 +4,66 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CLIENT
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   name      String
-  email     String   @unique
-  createdAt DateTime @default(now())
+  email     String    @unique
+  password  String
+  role      Role      @default(CLIENT)
+  createdAt DateTime  @default(now()) @map("created_at")
+  status Int @default(1) 
+  deletedAt DateTime? @map("deleted_at")
   loans     Loan[]
-}
 
+  @@map("users")
+}
+model BookCategory {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  createdAt DateTime  @default(now()) @map("created_at")
+  books     Book[]
+
+  @@map("book_categories")
+}
 model Book {
-  id        String   @id @default(uuid())
-  title     String
-  author    String
-  isbn      String   @unique
-  available Boolean  @default(true)
-  createdAt DateTime @default(now())
-  loans     Loan[]
-}
+  id              String        @id @default(uuid())
+  title           String
+  author          String
+  isbn            String        @unique
+  description     String?
+  publishedYear   Int?          @map("published_year")
+  pages           Int?
+  language        String?       @default("Español")
+  totalCopies     Int           @default(1) @map("total_copies")
+  availableCopies Int           @default(1) @map("available_copies")
+  imageKey        String?       @map("image_key")
+  categoryId      String?       @map("category_id")
+  status          Int           @default(1)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  deletedAt       DateTime?     @map("deleted_at")
 
+  category        BookCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  loans           Loan[]
+
+  @@map("books")
+}
 model Loan {
   id         String    @id @default(uuid())
-  userId     String
-  bookId     String
-  loanDate   DateTime  @default(now())
-  returnDate DateTime?
+  userId     String    @map("user_id")
+  bookId     String    @map("book_id")
+  loanDate   DateTime  @default(now()) @map("loan_date")
+  returnDate DateTime? @map("return_date")
 
-  user       User      @relation(fields: [userId], references: [id])
-  book       Book      @relation(fields: [bookId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@map("loans")
 }

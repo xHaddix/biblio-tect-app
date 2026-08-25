@@ -15,6 +15,26 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  # Servicio de almacenamiento MinIO
+  minio:
+    image: minio/minio:latest
+    container_name: library_minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # Servicio del Backend NestJS
   backend:
     build: .
@@ -27,8 +47,36 @@ services:
       - /app/node_modules
     environment:
       DATABASE_URL: 'postgresql://admin:libraryDb1234*@postgres:5432/library_db?schema=public'
+      JWT_SECRET: 'change-this-super-secret-key-in-production'
+      JWT_EXPIRES_IN: '1d'
+      MINIO_ENDPOINT: 'minio'
+      MINIO_PORT: '9000'
+      MINIO_PUBLIC_ENDPOINT: 'localhost'
+      MINIO_PUBLIC_PORT: '9000'
+      MINIO_USE_SSL: 'false'
+      MINIO_ACCESS_KEY: 'minioadmin'
+      MINIO_SECRET_KEY: 'minioadmin123'
+      MINIO_BUCKET: 'books-images'
+    command: sh -c "npm run prisma:setup && npm run start:dev"
     depends_on:
       - postgres
+      - minio
+
+  # Servicio del Frontend React (Vite)
+  frontend:
+    build: ./frontend
+    container_name: library_frontend
+    restart: always
+    ports:
+      - '5173:5173'
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
+  minio_data:
