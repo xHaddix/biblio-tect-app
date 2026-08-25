@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-floating-promises */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import React, { useState, useEffect } from 'react';
@@ -14,7 +16,7 @@ import {
   Check,
 } from 'lucide-react';
 import { authApi } from '../api/auth';
-import { getApiErrorMessage } from '../lib/api';
+import axios from 'axios';
 
 interface FieldErrors {
   email?: string;
@@ -79,12 +81,31 @@ export const Login = () => {
       localStorage.setItem('user', JSON.stringify(response.user));
       navigate('/dashboard');
     } catch (err: unknown) {
-      setError(
-        getApiErrorMessage(
-          err,
-          'Credenciales incorrectas o error al iniciar sesión',
-        ),
-      );
+      // Extracción segura del mensaje adaptada a la respuesta de NestJS
+      let errorMessage = 'Credenciales incorrectas o error al iniciar sesión';
+
+      if (axios.isAxiosError(err) && err.response?.data) {
+        const dataMessage = err.response.data.message;
+
+        if (typeof dataMessage === 'string') {
+          errorMessage = dataMessage;
+        } else if (Array.isArray(dataMessage)) {
+          errorMessage = dataMessage.join(', ');
+        } else if (
+          dataMessage &&
+          typeof dataMessage === 'object' &&
+          'message' in dataMessage
+        ) {
+          const innerMsg = (dataMessage as { message: unknown }).message;
+          if (typeof innerMsg === 'string') {
+            errorMessage = innerMsg;
+          } else if (Array.isArray(innerMsg)) {
+            errorMessage = innerMsg.join(', ');
+          }
+        }
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
