@@ -73,7 +73,7 @@ export class BooksController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.CLIENT)
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: createBookBodySchema })
