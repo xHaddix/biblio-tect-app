@@ -11,6 +11,7 @@ import {
   Loader2,
   Sparkles,
   AlertCircle,
+  Check,
 } from 'lucide-react';
 import { authApi } from '../api/auth';
 import { getApiErrorMessage } from '../lib/api';
@@ -232,20 +233,34 @@ export const Login = () => {
 
             {/* Fila de Opción Recordarme / Olvidé contraseña */}
             <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600 hover:text-slate-900 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent/30 transition-all cursor-pointer accent-brand-accent"
-                />
-                <span>Recordarme</span>
+              <label
+                onClick={() => setRememberMe(!rememberMe)}
+                className="group flex items-center gap-2.5 cursor-pointer select-none text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                {/* Custom Checkbox Animado */}
+                <div
+                  className={`relative flex h-5 w-5 items-center justify-center rounded-lg border transition-all duration-300 ease-out ${
+                    rememberMe
+                      ? 'border-brand-accent bg-brand-accent shadow-md shadow-brand-accent/25 scale-105'
+                      : 'border-slate-300 bg-white group-hover:border-slate-400 group-hover:bg-slate-50'
+                  }`}
+                >
+                  <Check
+                    className={`h-3.5 w-3.5 text-white stroke-[3] transition-all duration-300 ease-out ${
+                      rememberMe
+                        ? 'opacity-100 scale-100 rotate-0'
+                        : 'opacity-0 scale-50 -rotate-45'
+                    }`}
+                  />
+                </div>
+
+                <span className="font-medium">Recordarme</span>
               </label>
 
               <button
                 type="button"
                 onClick={() => alert('Función de recuperación de contraseña')}
-                className="font-medium text-brand-accent transition-colors hover:text-brand-accent-hover hover:underline"
+                className="font-medium text-brand-accent transition-all duration-200 hover:text-brand-accent-hover hover:underline"
               >
                 ¿Olvidaste tu contraseña?
               </button>
