@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   BookOpen,
@@ -23,11 +23,21 @@ interface FieldErrors {
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Precargar credenciales guardadas si existen
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('remembered_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   const validateForm = (): boolean => {
     const errors: FieldErrors = {};
@@ -56,6 +66,13 @@ export const Login = () => {
 
     try {
       const response = await authApi.login({ email, password });
+
+      // Manejo de la opción Recordarme
+      if (rememberMe) {
+        localStorage.setItem('remembered_email', email);
+      } else {
+        localStorage.removeItem('remembered_email');
+      }
 
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('user', JSON.stringify(response.user));
@@ -122,7 +139,7 @@ export const Login = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} noValidate className="space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
             {/* Input Correo */}
             <div className="group">
               <label className="block text-sm font-medium text-slate-700 transition-colors group-focus-within:text-brand-accent">
@@ -153,7 +170,6 @@ export const Login = () => {
                 />
               </div>
 
-              {/* Animación fluida de entrada mediante utilidades de Tailwind */}
               {fieldErrors.email && (
                 <p className="mt-2 flex items-center gap-1.5 px-1 text-xs font-medium text-red-500 transition-all duration-300 animate-in fade-in slide-in-from-top-1">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
@@ -206,13 +222,33 @@ export const Login = () => {
                 </button>
               </div>
 
-              {/* Animación fluida de entrada mediante utilidades de Tailwind */}
               {fieldErrors.password && (
                 <p className="mt-2 flex items-center gap-1.5 px-1 text-xs font-medium text-red-500 transition-all duration-300 animate-in fade-in slide-in-from-top-1">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
                   <span>{fieldErrors.password}</span>
                 </p>
               )}
+            </div>
+
+            {/* Fila de Opción Recordarme / Olvidé contraseña */}
+            <div className="flex items-center justify-between text-sm">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600 hover:text-slate-900 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent/30 transition-all cursor-pointer accent-brand-accent"
+                />
+                <span>Recordarme</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => alert('Función de recuperación de contraseña')}
+                className="font-medium text-brand-accent transition-colors hover:text-brand-accent-hover hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
             </div>
 
             {/* Botón de Submit */}
