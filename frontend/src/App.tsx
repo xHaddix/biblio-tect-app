@@ -6,6 +6,7 @@ import { Users } from './pages/Users';
 import { Books } from './pages/Books';
 import { Loans } from './pages/Loans';
 import { BookDetail } from './pages/BookDetail';
+import { Catalog } from './pages/Catalog';
 
 export function App() {
   return (
@@ -17,6 +18,7 @@ export function App() {
         <Route path="/users" element={<Users />} />
         <Route path="/books" element={<Books />} />
         <Route path="/loans" element={<Loans />} />
+        <Route path="/catalog" element={<Catalog />} />
         <Route path="/books/:id" element={<BookDetail />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

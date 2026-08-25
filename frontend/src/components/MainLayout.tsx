@@ -8,6 +8,7 @@ import {
   LogOut,
   ChevronLeft,
   Menu,
+  Store,
 } from 'lucide-react';
 
 interface MainLayoutProps {
@@ -30,15 +31,43 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('user');
+    localStorage.removeItem('auth-storage');
     void navigate('/login');
   };
 
-  const navItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/users', label: 'Usuarios', icon: Users },
-    { to: '/books', label: 'Libros', icon: BookOpen },
-    { to: '/loans', label: 'Préstamos', icon: Receipt },
-  ];
+  // Detección dinámica del rol del usuario actual
+  const getUserRole = (): string => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const parsedUser = JSON.parse(userStr) as { role?: string };
+        if (parsedUser?.role) {
+          return parsedUser.role.trim().toUpperCase();
+        }
+      }
+    } catch {
+      // Fallback seguro
+    }
+    return 'ADMIN';
+  };
+
+  const userRole = getUserRole();
+  const isClient = userRole === 'CLIENT';
+
+  // Definición de ítems del menú según el rol
+  const navItems = isClient
+    ? [
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { to: '/catalog', label: 'Catálogo', icon: Store },
+        { to: '/loans', label: 'Mis Préstamos', icon: Receipt },
+      ]
+    : [
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { to: '/catalog', label: 'Catálogo', icon: Store },
+        { to: '/users', label: 'Usuarios', icon: Users },
+        { to: '/books', label: 'Libros', icon: BookOpen },
+        { to: '/loans', label: 'Préstamos', icon: Receipt },
+      ];
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -51,7 +80,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         {/* Botón Flotante para Colapsar/Expandir */}
         <button
           onClick={() => setIsCollapsed((prev) => !prev)}
-          className="absolute -right-3.5 top-7 z-50 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-brand-dark text-white shadow-md transition-transform hover:scale-110 active:scale-95"
+          className="absolute -right-3.5 top-7 z-50 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-brand-dark text-white shadow-md transition-transform hover:scale-110 active:scale-95 cursor-pointer"
           aria-label={isCollapsed ? 'Expandir barra' : 'Colapsar barra'}
         >
           {isCollapsed ? (
@@ -69,7 +98,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             </div>
             {!isCollapsed && (
               <span className="text-xl font-bold tracking-wide text-white truncate animate-in fade-in duration-200">
-                Biblioteca
+                Bosque de tinta
               </span>
             )}
           </div>
@@ -107,7 +136,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <div className="border-t border-white/10 pt-4">
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-3.5 rounded-xl px-3.5 py-3 text-sm font-medium text-rose-300 transition-colors hover:bg-rose-500/10 hover:text-rose-200"
+            className="flex w-full items-center gap-3.5 rounded-xl px-3.5 py-3 text-sm font-medium text-rose-300 transition-colors hover:bg-rose-500/10 hover:text-rose-200 cursor-pointer"
             title={isCollapsed ? 'Cerrar sesión' : undefined}
           >
             <LogOut className="h-5 w-5 shrink-0" />

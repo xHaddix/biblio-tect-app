@@ -39,8 +39,24 @@ export class LoansService {
       throw new BadRequestException('El libro no tiene copias disponibles');
     }
 
+    // 1. Validar si el usuario ya tiene un préstamo activo de este mismo libro
+    const activeLoan = await this.prisma.loan.findFirst({
+      where: {
+        userId,
+        bookId,
+        returnDate: null, // Asumiendo que si returnDate es null, el préstamo sigue activo
+      },
+    });
+
+    if (activeLoan) {
+      throw new BadRequestException(
+        'Ya tienes una copia de este libro en préstamo activo.',
+      );
+    }
+
+    // 2. Transacción segura usando la instancia 'tx'
     return this.prisma.$transaction(async (tx) => {
-      await this.prisma.book.update({
+      await tx.book.update({
         where: { id: bookId },
         data: { availableCopies: { decrement: 1 } },
       });
@@ -83,7 +99,7 @@ export class LoansService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      await this.prisma.book.update({
+      await tx.book.update({
         where: { id: loan.bookId },
         data: { availableCopies: { increment: 1 } },
       });

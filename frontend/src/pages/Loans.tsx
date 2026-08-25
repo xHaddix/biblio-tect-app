@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { useEffect, useState, useRef } from 'react';
 import { MainLayout } from '../components/MainLayout';
+import { ConfirmModal } from '../components/ConfirmModal';
 import {
   Plus,
   CheckCircle2,
@@ -31,13 +32,32 @@ export const Loans = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Modal personalizado de devolución
+  const [returningLoanId, setReturningLoanId] = useState<string | null>(null);
+  const [isReturning, setIsReturning] = useState(false);
+
+  // Obtener rol y usuario actual desde localStorage
+  const userStr = localStorage.getItem('user');
+  let currentUserRole = 'ADMIN';
+  let currentUserId = '';
+  if (userStr) {
+    try {
+      const parsed = JSON.parse(userStr) as { role?: string; id?: string };
+      if (parsed.role) currentUserRole = parsed.role;
+      if (parsed.id) currentUserId = parsed.id;
+    } catch {
+      // Fallback seguro
+    }
+  }
+  const isClient = currentUserRole === 'CLIENT';
+
   // Filtros de la lista principal
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<
     'ALL' | 'ACTIVE' | 'RETURNED'
   >('ALL');
 
-  // Formulario / Modal
+  // Formulario
   const [isCreating, setIsCreating] = useState(false);
   const [selectedUser, setSelectedUser] = useState('');
   const [selectedBook, setSelectedBook] = useState('');
@@ -103,14 +123,12 @@ export const Loans = () => {
   const selectedBookObj = books.find((b) => b.id === selectedBook);
   const selectedUserObj = users.find((u) => u.id === selectedUser);
 
-  // Filtrado dinámico dentro del desplegable de Usuarios
   const filteredUsersOptions = users.filter(
     (u) =>
       u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
       u.email.toLowerCase().includes(userSearch.toLowerCase()),
   );
 
-  // Filtrado dinámico dentro del desplegable de Libros (Categoría + Nombre/Autor)
   const filteredBooksOptions = books.filter((b) => {
     const matchesCategory =
       selectedCategoryFilter === 'ALL' ||
@@ -140,22 +158,30 @@ export const Loans = () => {
     }
   };
 
-  const handleReturnLoan = async (id: string) => {
-    if (!confirm('¿Confirmas la devolución de este libro?')) return;
+  const handleConfirmReturn = async () => {
+    if (!returningLoanId) return;
     try {
-      await loansApi.returnLoan(id);
+      setIsReturning(true);
+      await loansApi.returnLoan(returningLoanId);
+      setReturningLoanId(null);
       void fetchData();
     } catch (err) {
       alert(getApiErrorMessage(err, 'Error al procesar devolución'));
+    } finally {
+      setIsReturning(false);
     }
   };
 
-  // KPIs
-  const activeLoansCount = loans.filter((l) => !l.returnDate).length;
-  const returnedLoansCount = loans.filter((l) => l.returnDate).length;
+  const baseLoans = isClient
+    ? loans.filter(
+        (l) => l.userId === currentUserId || l.user?.id === currentUserId,
+      )
+    : loans;
 
-  // Filtrado de lista principal
-  const filteredLoans = loans.filter((loan) => {
+  const activeLoansCount = baseLoans.filter((l) => !l.returnDate).length;
+  const returnedLoansCount = baseLoans.filter((l) => l.returnDate).length;
+
+  const filteredLoans = baseLoans.filter((loan) => {
     const userName = (loan.user?.name || '').toLowerCase();
     const bookTitle = (loan.book?.title || '').toLowerCase();
     const search = searchTerm.toLowerCase();
@@ -179,21 +205,24 @@ export const Loans = () => {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
-              Gestión de Préstamos
+              {isClient ? 'Mis Préstamos' : 'Gestión de Préstamos'}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Control general de circulaciones, reservas activas y devoluciones
-              de libros.
+              {isClient
+                ? 'Consulta el estado de tus libros solicitados e historial de préstamos.'
+                : 'Control general de circulaciones, reservas activas y devoluciones de libros.'}
             </p>
           </div>
 
-          <button
-            onClick={() => setIsCreating(true)}
-            className="flex items-center justify-center gap-2 rounded-xl bg-brand-accent px-5 py-3 font-semibold text-white shadow-md transition-all duration-300 hover:bg-brand-accent-hover hover:shadow-lg active:scale-95 text-sm"
-          >
-            <Plus className="h-5 w-5" />
-            <span>Nuevo préstamo</span>
-          </button>
+          {!isClient && (
+            <button
+              onClick={() => setIsCreating(true)}
+              className="flex items-center justify-center gap-2 rounded-xl bg-brand-accent px-5 py-3 font-semibold text-white shadow-md transition-all duration-300 hover:bg-brand-accent-hover hover:shadow-lg active:scale-95 text-sm cursor-pointer"
+            >
+              <Plus className="h-5 w-5" />
+              <span>Nuevo préstamo</span>
+            </button>
+          )}
         </div>
 
         {/* Tarjetas KPI */}
@@ -205,7 +234,7 @@ export const Loans = () => {
                   Total Registros
                 </p>
                 <p className="mt-1 text-2xl font-bold text-slate-900">
-                  {loans.length}
+                  {baseLoans.length}
                 </p>
               </div>
               <div className="rounded-xl bg-blue-50 p-3 text-blue-600">
@@ -247,8 +276,8 @@ export const Loans = () => {
           </div>
         </div>
 
-        {/* Formulario / Modal de Nuevo Préstamo */}
-        {isCreating && (
+        {/* Formulario de Nuevo Préstamo */}
+        {!isClient && isCreating && (
           <div className="rounded-2xl border border-brand-accent/20 bg-white p-6 shadow-xl transition-all duration-300 animate-in fade-in slide-in-from-top-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
               <div className="flex items-center gap-2">
@@ -267,7 +296,7 @@ export const Loans = () => {
 
             <form onSubmit={handleCreateLoan} className="space-y-6">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {/* Custom Select - USUARIO CON BUSCADOR */}
+                {/* Select Usuario */}
                 <div className="relative" ref={userDropdownRef}>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
                     Usuario solicitante
@@ -353,7 +382,7 @@ export const Loans = () => {
                   )}
                 </div>
 
-                {/* Custom Select - LIBRO CON BUSCADOR Y FILTRO DE CATEGORÍAS */}
+                {/* Select Libro */}
                 <div className="relative" ref={bookDropdownRef}>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
                     Libro disponible
@@ -404,7 +433,6 @@ export const Loans = () => {
 
                   {isBookOpen && (
                     <div className="absolute left-0 top-full z-50 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
-                      {/* Buscador de Libro */}
                       <div className="relative mb-3">
                         <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                         <input
@@ -417,7 +445,6 @@ export const Loans = () => {
                         />
                       </div>
 
-                      {/* Filtro por Categoría (Chips) */}
                       <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1.5 text-[11px] no-scrollbar">
                         <span className="flex items-center gap-1 text-slate-400 font-medium pr-1">
                           <Filter className="h-3 w-3" /> Categoría:
@@ -449,7 +476,6 @@ export const Loans = () => {
                         ))}
                       </div>
 
-                      {/* Lista de Opciones */}
                       <div className="max-h-52 overflow-y-auto space-y-1">
                         {filteredBooksOptions.length === 0 ? (
                           <p className="p-3 text-center text-xs text-slate-400">
@@ -503,7 +529,7 @@ export const Loans = () => {
                 </div>
               </div>
 
-              {/* Vista Previa / Tarjeta Resumen */}
+              {/* Resumen */}
               <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-5 backdrop-blur-sm">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
                   Resumen de la transacción
@@ -553,7 +579,6 @@ export const Loans = () => {
                 </div>
               </div>
 
-              {/* Botones de Acción */}
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -581,7 +606,7 @@ export const Loans = () => {
           </div>
         )}
 
-        {/* Controles de Búsqueda y Filtros de la Lista */}
+        {/* Búsqueda y Filtros */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -740,13 +765,19 @@ export const Loans = () => {
 
                       <td className="px-6 py-4 text-right whitespace-nowrap">
                         {!loan.returnDate ? (
-                          <button
-                            onClick={() => void handleReturnLoan(loan.id)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100 hover:text-emerald-800 active:scale-95"
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            <span>Registrar devolución</span>
-                          </button>
+                          isClient ? (
+                            <span className="text-xs text-slate-400 italic">
+                              En posesión
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setReturningLoanId(loan.id)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100 hover:text-emerald-800 active:scale-95 cursor-pointer"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              <span>Registrar devolución</span>
+                            </button>
+                          )
                         ) : (
                           <span className="text-xs text-slate-400 italic">
                             Completado
@@ -761,6 +792,18 @@ export const Loans = () => {
           )}
         </div>
       </div>
+
+      {/* Modal de Confirmación para Devoluciones */}
+      <ConfirmModal
+        isOpen={!!returningLoanId}
+        onClose={() => setReturningLoanId(null)}
+        onConfirm={handleConfirmReturn}
+        title="¿Confirmar devolución?"
+        message="¿Estás seguro de registrar la devolución de este libro? Se reincorporará una copia al catálogo."
+        confirmText="Sí, devolver"
+        cancelText="Cancelar"
+        isLoading={isReturning}
+      />
     </MainLayout>
   );
 };
