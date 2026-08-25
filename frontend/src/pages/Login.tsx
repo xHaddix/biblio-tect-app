@@ -78,8 +78,13 @@ export const Login = () => {
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('user', JSON.stringify(response.user));
       navigate('/dashboard');
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Error al iniciar sesión'));
+    } catch (err: unknown) {
+      setError(
+        getApiErrorMessage(
+          err,
+          'Credenciales incorrectas o error al iniciar sesión',
+        ),
+      );
     } finally {
       setLoading(false);
     }
