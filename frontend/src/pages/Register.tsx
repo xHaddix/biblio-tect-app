@@ -27,7 +27,7 @@ export const Register = () => {
 
     try {
       const response = await authApi.register(name, email, password);
-      localStorage.setItem('accessToken', response.access_token);
+      localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('user', JSON.stringify(response.user));
       void navigate('/dashboard');
     } catch (err) {
