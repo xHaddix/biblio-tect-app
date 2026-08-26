@@ -246,17 +246,6 @@ export const Catalog = () => {
               % del total
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm hidden lg:block">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Categorías
-            </p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">
-              {categories.length}
-            </p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Categorías registradas
-            </p>
-          </div>
         </div>
 
         {successMessage && (
