@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { MainLayout } from '../components/MainLayout';
 import {
   Search,
@@ -9,12 +9,15 @@ import {
   Filter,
   RotateCcw,
   Check,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { booksApi } from '../api/books';
 import { loansApi } from '../api/loans';
 import { getApiErrorMessage } from '../lib/api';
 import type { Book, Category, Loan } from '../types';
+import { CategoryDropdown } from '../components/CategoryDropdown';
 
 export const Catalog = () => {
   const [books, setBooks] = useState<Book[]>([]);
@@ -32,6 +35,17 @@ export const Catalog = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Referencias para scroll horizontal
+  const scrollRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  const scroll = (key: string, direction: 'left' | 'right') => {
+    const container = scrollRefs.current[key];
+    if (container) {
+      const scrollAmount = direction === 'left' ? -400 : 400;
+      container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -44,7 +58,6 @@ export const Catalog = () => {
       setBooks(booksData);
       setCategories(categoriesData);
 
-      // Filtrar préstamos activos del usuario logueado
       const userStr = localStorage.getItem('user');
       if (userStr) {
         const user = JSON.parse(userStr) as { id: string };
@@ -160,6 +173,7 @@ export const Catalog = () => {
           </p>
         </div>
 
+        {/* Tarjetas KPI */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -232,7 +246,7 @@ export const Catalog = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-3 space-y-8">
+          <div className="lg:col-span-3 space-y-8 min-w-0">
             <div className="relative w-full">
               <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -255,7 +269,7 @@ export const Catalog = () => {
             ) : (
               <div className="space-y-10">
                 {booksByCategory.map(({ category, books: catBooks }) => (
-                  <div key={category.id} className="space-y-4">
+                  <div key={category.id} className="space-y-4 group/row">
                     <div className="border-b border-slate-200 pb-2 flex items-center justify-between">
                       <h2 className="text-lg font-bold text-slate-800 tracking-wide">
                         {category.name}
@@ -266,9 +280,160 @@ export const Catalog = () => {
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap gap-4">
-                      <AnimatePresence>
-                        {catBooks.map((book, idx) => {
+                    {/* Carrusel deslizable estilo Netflix */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => scroll(category.id, 'left')}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-white/90 shadow-md border border-slate-200/80 flex items-center justify-center text-slate-700 opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-white hover:scale-110 cursor-pointer"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+
+                      <div
+                        ref={(el) => {
+                          scrollRefs.current[category.id] = el;
+                        }}
+                        className="flex gap-4 overflow-x-auto scroll-smooth py-2 px-1 snap-x no-scrollbar"
+                      >
+                        <AnimatePresence>
+                          {catBooks.map((book, idx) => {
+                            const copies =
+                              (book as { availableCopies?: number })
+                                .availableCopies ?? 0;
+                            const imageUrl = (book as { imageUrl?: string })
+                              .imageUrl;
+                            const isAlreadyLoaned = hasActiveLoan(book.id);
+
+                            return (
+                              <motion.div
+                                key={book.id}
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{
+                                  duration: 0.25,
+                                  delay: idx * 0.03,
+                                }}
+                                className="snap-start bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group p-3 space-y-2 w-[190px] shrink-0"
+                              >
+                                <div className="h-48 bg-slate-50 rounded-xl flex items-center justify-center relative border border-slate-100 overflow-hidden p-2">
+                                  {imageUrl ? (
+                                    <img
+                                      src={imageUrl}
+                                      alt={book.title}
+                                      className="h-full w-full object-contain rounded-lg shadow-sm group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                  ) : (
+                                    <div className="h-14 w-10 bg-white rounded-lg shadow-md border border-amber-200/60 flex items-center justify-center text-[#5c3d2e]">
+                                      <BookOpen className="h-5 w-5" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="space-y-1 flex-1">
+                                  <span
+                                    className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                      copies > 0
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                        : 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                    }`}
+                                  >
+                                    {copies > 0 ? 'Disponible' : 'Prestado'}
+                                  </span>
+                                  <h3
+                                    className="font-bold text-slate-900 line-clamp-1 text-xs"
+                                    title={book.title}
+                                  >
+                                    {book.title}
+                                  </h3>
+                                  {book.isbn && (
+                                    <p className="text-[10px] text-slate-400 font-medium truncate">
+                                      ISBN: {book.isbn}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <motion.button
+                                  whileHover={{
+                                    scale:
+                                      copies > 0 && !isAlreadyLoaned ? 1.02 : 1,
+                                  }}
+                                  whileTap={{
+                                    scale:
+                                      copies > 0 && !isAlreadyLoaned ? 0.98 : 1,
+                                  }}
+                                  disabled={
+                                    copies <= 0 ||
+                                    requestingId === book.id ||
+                                    isAlreadyLoaned
+                                  }
+                                  onClick={() =>
+                                    void handleRequestLoan(book.id)
+                                  }
+                                  className={`w-full flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-[11px] font-semibold transition shadow-sm cursor-pointer ${
+                                    isAlreadyLoaned
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-300 cursor-not-allowed'
+                                      : copies > 0
+                                        ? 'bg-brand-accent text-white hover:bg-brand-accent-hover'
+                                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                  }`}
+                                >
+                                  {isAlreadyLoaned ? (
+                                    <>
+                                      <Check className="h-3 w-3 text-amber-700" />
+                                      <span>Ya solicitado</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <BookmarkPlus className="h-3 w-3" />
+                                      <span>
+                                        {requestingId === book.id
+                                          ? 'Solicitando...'
+                                          : 'Solicitar'}
+                                      </span>
+                                    </>
+                                  )}
+                                </motion.button>
+                              </motion.div>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => scroll(category.id, 'right')}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-white/90 shadow-md border border-slate-200/80 flex items-center justify-center text-slate-700 opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-white hover:scale-110 cursor-pointer"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {uncategorizedBooks.length > 0 && (
+                  <div className="space-y-4 group/row">
+                    <div className="border-b border-slate-200 pb-2">
+                      <h2 className="text-lg font-bold text-slate-800 tracking-wide">
+                        Otros libros
+                      </h2>
+                    </div>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => scroll('uncategorized', 'left')}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-white/90 shadow-md border border-slate-200/80 flex items-center justify-center text-slate-700 opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-white hover:scale-110 cursor-pointer"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+
+                      <div
+                        ref={(el) => {
+                          scrollRefs.current['uncategorized'] = el;
+                        }}
+                        className="flex gap-4 overflow-x-auto scroll-smooth py-2 px-1 snap-x no-scrollbar"
+                      >
+                        {uncategorizedBooks.map((book) => {
                           const copies =
                             (book as { availableCopies?: number })
                               .availableCopies ?? 0;
@@ -277,168 +442,69 @@ export const Catalog = () => {
                           const isAlreadyLoaned = hasActiveLoan(book.id);
 
                           return (
-                            <motion.div
+                            <div
                               key={book.id}
-                              initial={{ opacity: 0, scale: 0.95 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ duration: 0.25, delay: idx * 0.03 }}
-                              className="bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group p-3 space-y-2 w-[190px]"
+                              className="snap-start bg-white rounded-2xl border border-slate-200/70 shadow-sm p-3 space-y-2 w-[190px] shrink-0 flex flex-col justify-between"
                             >
-                              <div className="h-48 bg-slate-50 rounded-xl flex items-center justify-center relative border border-slate-100 overflow-hidden p-2">
+                              <div className="h-48 bg-slate-50 rounded-xl flex items-center justify-center border p-2">
                                 {imageUrl ? (
                                   <img
                                     src={imageUrl}
-                                    alt={book.title}
-                                    className="h-full w-full object-contain rounded-lg shadow-sm group-hover:scale-105 transition-transform duration-300"
+                                    alt=""
+                                    className="h-full w-full object-contain rounded-lg"
                                   />
                                 ) : (
-                                  <div className="h-14 w-10 bg-white rounded-lg shadow-md border border-amber-200/60 flex items-center justify-center text-[#5c3d2e]">
-                                    <BookOpen className="h-5 w-5" />
-                                  </div>
+                                  <BookOpen className="h-5 w-5 text-slate-400" />
                                 )}
                               </div>
-
                               <div className="space-y-1 flex-1">
                                 <span
-                                  className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                                    copies > 0
-                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                                      : 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                                  }`}
+                                  className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${copies > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}
                                 >
                                   {copies > 0 ? 'Disponible' : 'Prestado'}
                                 </span>
-                                <h3
-                                  className="font-bold text-slate-900 line-clamp-1 text-xs"
-                                  title={book.title}
-                                >
+                                <h3 className="font-bold text-xs text-slate-900 line-clamp-1">
                                   {book.title}
                                 </h3>
                                 {book.isbn && (
-                                  <p className="text-[10px] text-slate-400 font-medium truncate">
+                                  <p className="text-[10px] text-slate-400 truncate">
                                     ISBN: {book.isbn}
                                   </p>
                                 )}
                               </div>
-
-                              <motion.button
-                                whileHover={{
-                                  scale:
-                                    copies > 0 && !isAlreadyLoaned ? 1.02 : 1,
-                                }}
-                                whileTap={{
-                                  scale:
-                                    copies > 0 && !isAlreadyLoaned ? 0.98 : 1,
-                                }}
+                              <button
                                 disabled={
                                   copies <= 0 ||
                                   requestingId === book.id ||
                                   isAlreadyLoaned
                                 }
                                 onClick={() => void handleRequestLoan(book.id)}
-                                className={`w-full flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-[11px] font-semibold transition shadow-sm cursor-pointer ${
+                                className={`w-full py-1.5 rounded-xl text-[11px] font-semibold cursor-pointer ${
                                   isAlreadyLoaned
                                     ? 'bg-amber-100 text-amber-800 border border-amber-300 cursor-not-allowed'
                                     : copies > 0
-                                      ? 'bg-brand-accent text-white hover:bg-brand-accent-hover'
+                                      ? 'bg-brand-accent hover:bg-brand-accent-hover text-white'
                                       : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                 }`}
                               >
-                                {isAlreadyLoaned ? (
-                                  <>
-                                    <Check className="h-3 w-3 text-amber-700" />
-                                    <span>Ya solicitado</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <BookmarkPlus className="h-3 w-3" />
-                                    <span>
-                                      {requestingId === book.id
-                                        ? 'Solicitando...'
-                                        : 'Solicitar'}
-                                    </span>
-                                  </>
-                                )}
-                              </motion.button>
-                            </motion.div>
+                                {isAlreadyLoaned
+                                  ? 'Ya solicitado'
+                                  : requestingId === book.id
+                                    ? 'Solicitando...'
+                                    : 'Solicitar'}
+                              </button>
+                            </div>
                           );
                         })}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                ))}
+                      </div>
 
-                {uncategorizedBooks.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="border-b border-slate-200 pb-2">
-                      <h2 className="text-lg font-bold text-slate-800 tracking-wide">
-                        Otros libros
-                      </h2>
-                    </div>
-                    <div className="flex flex-wrap gap-4">
-                      {uncategorizedBooks.map((book) => {
-                        const copies =
-                          (book as { availableCopies?: number })
-                            .availableCopies ?? 0;
-                        const imageUrl = (book as { imageUrl?: string })
-                          .imageUrl;
-                        const isAlreadyLoaned = hasActiveLoan(book.id);
-
-                        return (
-                          <div
-                            key={book.id}
-                            className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-3 space-y-2 w-[190px] flex flex-col justify-between"
-                          >
-                            <div className="h-48 bg-slate-50 rounded-xl flex items-center justify-center border p-2">
-                              {imageUrl ? (
-                                <img
-                                  src={imageUrl}
-                                  alt=""
-                                  className="h-full w-full object-contain rounded-lg"
-                                />
-                              ) : (
-                                <BookOpen className="h-5 w-5 text-slate-400" />
-                              )}
-                            </div>
-                            <div className="space-y-1 flex-1">
-                              <span
-                                className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${copies > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}
-                              >
-                                {copies > 0 ? 'Disponible' : 'Prestado'}
-                              </span>
-                              <h3 className="font-bold text-xs text-slate-900 line-clamp-1">
-                                {book.title}
-                              </h3>
-                              {book.isbn && (
-                                <p className="text-[10px] text-slate-400 truncate">
-                                  ISBN: {book.isbn}
-                                </p>
-                              )}
-                            </div>
-                            <button
-                              disabled={
-                                copies <= 0 ||
-                                requestingId === book.id ||
-                                isAlreadyLoaned
-                              }
-                              onClick={() => void handleRequestLoan(book.id)}
-                              className={`w-full py-1.5 rounded-xl text-[11px] font-semibold ${
-                                isAlreadyLoaned
-                                  ? 'bg-amber-100 text-amber-800 border border-amber-300 cursor-not-allowed'
-                                  : copies > 0
-                                    ? 'bg-brand-accent hover:bg-brand-accent-hover text-white'
-                                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                              }`}
-                            >
-                              {isAlreadyLoaned
-                                ? 'Ya solicitado'
-                                : requestingId === book.id
-                                  ? 'Solicitando...'
-                                  : 'Solicitar'}
-                            </button>
-                          </div>
-                        );
-                      })}
+                      <button
+                        type="button"
+                        onClick={() => scroll('uncategorized', 'right')}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-white/90 shadow-md border border-slate-200/80 flex items-center justify-center text-slate-700 opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-white hover:scale-110 cursor-pointer"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
                     </div>
                   </div>
                 )}
@@ -446,6 +512,7 @@ export const Catalog = () => {
             )}
           </div>
 
+          {/* Panel Lateral con Filtros y CategoryDropdown */}
           <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-6 h-fit">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2 font-bold text-slate-900">
@@ -468,18 +535,11 @@ export const Catalog = () => {
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
                 Categoría
               </label>
-              <select
+              <CategoryDropdown
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-700 focus:border-brand-accent focus:outline-none transition shadow-sm cursor-pointer"
-              >
-                <option value="ALL">Todas las categorías</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setSelectedCategory(val)}
+                categories={categories}
+              />
             </div>
 
             <div className="space-y-3">
