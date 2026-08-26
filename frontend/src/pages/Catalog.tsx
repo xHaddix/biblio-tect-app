@@ -11,13 +11,14 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { booksApi } from '../api/books';
 import { loansApi } from '../api/loans';
 import { getApiErrorMessage } from '../lib/api';
 import type { Book, Category, Loan } from '../types';
-import { CategoryDropdown } from '../components/CategoryDropdown';
+import { BookDetailModal } from '../components/BookDetailModal';
 
 export const Catalog = () => {
   const [books, setBooks] = useState<Book[]>([]);
@@ -25,17 +26,28 @@ export const Catalog = () => {
   const [userLoans, setUserLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Modal de detalle
+  const [selectedDetailBook, setSelectedDetailBook] = useState<Book | null>(
+    null,
+  );
+
+  // Filtros principales
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState<
     'ALL' | 'AVAILABLE' | 'LOANED'
   >('ALL');
 
+  // Estados para el Custom Select de Categorías (Reutilizado de Loans)
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
   const [requestingId, setRequestingId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Referencias para scroll horizontal
+  // Referencias para scroll horizontal tipo Netflix
   const scrollRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const scroll = (key: string, direction: 'left' | 'right') => {
@@ -77,6 +89,20 @@ export const Catalog = () => {
 
   useEffect(() => {
     void fetchData();
+  }, []);
+
+  // Cerrar desplegable al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsCategoryOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const hasActiveLoan = (bookId: string) => {
@@ -149,6 +175,12 @@ export const Catalog = () => {
         (cat) => cat.id === (b as { categoryId?: string }).categoryId,
       ),
   );
+
+  const filteredCategoriesOptions = categories.filter((c) =>
+    c.name.toLowerCase().includes(categorySearch.toLowerCase()),
+  );
+
+  const selectedCategoryObj = categories.find((c) => c.id === selectedCategory);
 
   const totalBooksCount = books.length;
   const availableBooksCount = books.filter(
@@ -280,7 +312,6 @@ export const Catalog = () => {
                       </span>
                     </div>
 
-                    {/* Carrusel deslizable estilo Netflix */}
                     <div className="relative">
                       <button
                         type="button"
@@ -314,7 +345,8 @@ export const Catalog = () => {
                                   duration: 0.25,
                                   delay: idx * 0.03,
                                 }}
-                                className="snap-start bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group p-3 space-y-2 w-[190px] shrink-0"
+                                className="snap-start bg-white rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group p-3 space-y-2 w-[190px] shrink-0 cursor-pointer"
+                                onClick={() => setSelectedDetailBook(book)}
                               >
                                 <div className="h-48 bg-slate-50 rounded-xl flex items-center justify-center relative border border-slate-100 overflow-hidden p-2">
                                   {imageUrl ? (
@@ -367,9 +399,10 @@ export const Catalog = () => {
                                     requestingId === book.id ||
                                     isAlreadyLoaned
                                   }
-                                  onClick={() =>
-                                    void handleRequestLoan(book.id)
-                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleRequestLoan(book.id);
+                                  }}
                                   className={`w-full flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-[11px] font-semibold transition shadow-sm cursor-pointer ${
                                     isAlreadyLoaned
                                       ? 'bg-amber-100 text-amber-800 border border-amber-300 cursor-not-allowed'
@@ -444,7 +477,8 @@ export const Catalog = () => {
                           return (
                             <div
                               key={book.id}
-                              className="snap-start bg-white rounded-2xl border border-slate-200/70 shadow-sm p-3 space-y-2 w-[190px] shrink-0 flex flex-col justify-between"
+                              className="snap-start bg-white rounded-2xl border border-slate-200/70 shadow-sm p-3 space-y-2 w-[190px] shrink-0 flex flex-col justify-between cursor-pointer"
+                              onClick={() => setSelectedDetailBook(book)}
                             >
                               <div className="h-48 bg-slate-50 rounded-xl flex items-center justify-center border p-2">
                                 {imageUrl ? (
@@ -478,7 +512,10 @@ export const Catalog = () => {
                                   requestingId === book.id ||
                                   isAlreadyLoaned
                                 }
-                                onClick={() => void handleRequestLoan(book.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleRequestLoan(book.id);
+                                }}
                                 className={`w-full py-1.5 rounded-xl text-[11px] font-semibold cursor-pointer ${
                                   isAlreadyLoaned
                                     ? 'bg-amber-100 text-amber-800 border border-amber-300 cursor-not-allowed'
@@ -512,7 +549,7 @@ export const Catalog = () => {
             )}
           </div>
 
-          {/* Panel Lateral con Filtros y CategoryDropdown */}
+          {/* Panel Lateral con Selector Reutilizado de Préstamos */}
           <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-6 h-fit">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2 font-bold text-slate-900">
@@ -524,6 +561,7 @@ export const Catalog = () => {
                   setSelectedCategory('ALL');
                   setSelectedStatus('ALL');
                   setSearch('');
+                  setCategorySearch('');
                 }}
                 className="text-xs font-semibold text-brand-accent hover:underline flex items-center gap-1 cursor-pointer"
               >
@@ -531,15 +569,102 @@ export const Catalog = () => {
               </button>
             </div>
 
-            <div className="space-y-2">
+            {/* Selector Personalizado con Buscador de Categorías (Reutilizado de Loans.tsx) */}
+            <div className="space-y-2 relative" ref={categoryDropdownRef}>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
                 Categoría
               </label>
-              <CategoryDropdown
-                value={selectedCategory}
-                onChange={(val) => setSelectedCategory(val)}
-                categories={categories}
-              />
+
+              <button
+                type="button"
+                onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+                className={`flex w-full items-center justify-between rounded-xl border bg-white p-2.5 text-sm transition-all ${
+                  isCategoryOpen
+                    ? 'border-brand-accent ring-4 ring-brand-accent/15'
+                    : 'border-slate-300 hover:border-slate-400'
+                }`}
+              >
+                <span
+                  className={
+                    selectedCategory === 'ALL'
+                      ? 'text-slate-600 font-medium'
+                      : 'font-semibold text-slate-900'
+                  }
+                >
+                  {selectedCategory === 'ALL'
+                    ? 'Todas las categorías'
+                    : selectedCategoryObj?.name || 'Seleccionar...'}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 text-slate-400 shrink-0 transition-transform duration-200 ${
+                    isCategoryOpen ? 'rotate-180 text-brand-accent' : ''
+                  }`}
+                />
+              </button>
+
+              {isCategoryOpen && (
+                <div className="absolute left-0 top-full z-50 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+                  {/* Buscador dentro del desplegable */}
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={categorySearch}
+                      onChange={(e) => setCategorySearch(e.target.value)}
+                      placeholder="Escribe para buscar..."
+                      className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-xs text-slate-900 focus:border-brand-accent focus:outline-none"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="max-h-52 overflow-y-auto space-y-1 no-scrollbar">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategory('ALL');
+                        setIsCategoryOpen(false);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-lg p-2 text-left text-xs transition-colors ${
+                        selectedCategory === 'ALL'
+                          ? 'bg-brand-accent/10 font-bold text-brand-accent'
+                          : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <span>Todas las categorías</span>
+                      {selectedCategory === 'ALL' && (
+                        <Check className="h-4 w-4 text-brand-accent" />
+                      )}
+                    </button>
+
+                    {filteredCategoriesOptions.length === 0 ? (
+                      <p className="p-3 text-center text-xs text-slate-400">
+                        No se encontraron categorías
+                      </p>
+                    ) : (
+                      filteredCategoriesOptions.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCategory(cat.id);
+                            setIsCategoryOpen(false);
+                          }}
+                          className={`flex w-full items-center justify-between rounded-lg p-2 text-left text-xs transition-colors ${
+                            selectedCategory === cat.id
+                              ? 'bg-brand-accent/10 font-bold text-brand-accent'
+                              : 'hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <span className="truncate">{cat.name}</span>
+                          {selectedCategory === cat.id && (
+                            <Check className="h-4 w-4 shrink-0 text-brand-accent ml-2" />
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -588,6 +713,18 @@ export const Catalog = () => {
           </div>
         </div>
       </motion.div>
+
+      {/* Modal Detalles */}
+      <BookDetailModal
+        book={selectedDetailBook}
+        isOpen={!!selectedDetailBook}
+        onClose={() => setSelectedDetailBook(null)}
+        onRequestLoan={(bookId) => void handleRequestLoan(bookId)}
+        isAlreadyLoaned={
+          selectedDetailBook ? hasActiveLoan(selectedDetailBook.id) : false
+        }
+        isRequesting={requestingId === selectedDetailBook?.id}
+      />
     </MainLayout>
   );
 };
