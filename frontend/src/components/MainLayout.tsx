@@ -18,26 +18,19 @@ interface MainLayoutProps {
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
-  // Inicializamos el estado leyendo el valor persistido en localStorage
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true';
   });
 
-  // Estado para la animación de cierre de sesión
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
   const navigate = useNavigate();
 
-  // Guardamos cada cambio en localStorage
   useEffect(() => {
     localStorage.setItem('sidebar_collapsed', String(isCollapsed));
   }, [isCollapsed]);
 
   const handleLogout = () => {
-    // Inicia el estado de animación
     setIsLoggingOut(true);
-
-    // Retraso para ver la transición suave antes de redirigir
     setTimeout(() => {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('user');
@@ -46,7 +39,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     }, 1200);
   };
 
-  // Detección dinámica del rol del usuario actual
   const getUserRole = (): string => {
     try {
       const userStr = localStorage.getItem('user');
@@ -57,7 +49,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         }
       }
     } catch {
-      // Fallback seguro
+      // Fallback
     }
     return 'ADMIN';
   };
@@ -65,7 +57,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const userRole = getUserRole();
   const isClient = userRole === 'CLIENT';
 
-  // Definición de ítems del menú según el rol
   const navItems = isClient
     ? [
         { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -81,10 +72,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       ];
 
   return (
-    <div className="flex min-h-screen bg-slate-50 relative overflow-hidden">
-      {/* Sidebar Deslizable */}
+    <div className="flex h-screen bg-slate-50 relative overflow-hidden">
+      {/* Sidebar Fijo a la altura de la pantalla */}
       <aside
-        className={`relative flex flex-col justify-between bg-brand-dark text-white p-4 transition-all duration-300 ease-in-out ${
+        className={`sticky top-0 h-screen flex flex-col justify-between bg-brand-dark text-white p-4 transition-all duration-300 ease-in-out z-30 shrink-0 ${
           isCollapsed ? 'w-20' : 'w-64'
         }`}
       >
@@ -101,9 +92,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           )}
         </button>
 
-        <div>
+        {/* Sección Superior: Header y Navegación con Scroll Interno si es necesario */}
+        <div className="flex flex-col min-h-0 flex-1">
           {/* Header del Sidebar */}
-          <div className="flex items-center gap-3 px-2 py-4">
+          <div className="flex items-center gap-3 px-2 py-4 shrink-0">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-accent text-white shadow-md">
               <BookOpen className="h-6 w-6" />
             </div>
@@ -114,8 +106,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             )}
           </div>
 
-          {/* Navegación */}
-          <nav className="mt-8 space-y-2">
+          {/* Navegación (con Scroll independiente) */}
+          <nav className="mt-8 space-y-2 overflow-y-auto flex-1 no-scrollbar pr-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -143,8 +135,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </nav>
         </div>
 
-        {/* Cerrar Sesión */}
-        <div className="border-t border-white/10 pt-4">
+        {/* Cerrar Sesión (Anclado siempre al pie del Sidebar) */}
+        <div className="border-t border-white/10 pt-4 shrink-0">
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}
@@ -161,8 +153,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         </div>
       </aside>
 
-      {/* Contenido Principal */}
-      <main className="flex-1 overflow-y-auto p-8 transition-all duration-300">
+      {/* Contenido Principal con desplazamiento propio */}
+      <main className="flex-1 h-screen overflow-y-auto p-8 transition-all duration-300">
         {children}
       </main>
 
