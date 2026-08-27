@@ -113,7 +113,7 @@ export const Books = () => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => handleOpenDrawer()}
-            className="flex items-center gap-2 rounded-lg bg-[#5c3d2e] px-4 py-2 font-semibold text-white hover:bg-[#4a3125] transition shadow-sm cursor-pointer"
+            className="flex items-center gap-2 rounded-lg bg-brand-accent px-4 py-2 font-semibold text-white hover:bg-brand-accent-hover transition shadow-sm cursor-pointer"
           >
             <Plus className="h-4 w-4" /> Crear libro
           </motion.button>
@@ -133,7 +133,7 @@ export const Books = () => {
               placeholder="Buscar libros..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 py-1.5 pl-9 pr-4 text-sm focus:border-[#5c3d2e] focus:outline-none transition"
+              className="w-full rounded-lg border border-slate-200 py-1.5 pl-9 pr-4 text-sm focus:border-brand-accent focus:outline-none transition"
             />
           </div>
 
@@ -218,7 +218,7 @@ export const Books = () => {
                           </Link>
                           <button
                             onClick={() => handleOpenDrawer(book)}
-                            className="text-slate-400 hover:text-[#5c3d2e] p-1 transition-colors cursor-pointer"
+                            className="text-slate-400 hover:text-brand-accent p-1 transition-colors cursor-pointer"
                           >
                             <Edit className="h-4 w-4" />
                           </button>

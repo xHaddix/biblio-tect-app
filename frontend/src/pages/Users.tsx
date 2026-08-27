@@ -16,6 +16,7 @@ import { usersApi } from '../api/users';
 import { getApiErrorMessage } from '../lib/api';
 import { UserDrawer } from '../components/UserDrawer';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { RoleDropdown } from '../components/RoleDropdown';
 
 export const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -174,18 +175,14 @@ export const Users = () => {
               className="w-full rounded-lg border border-slate-200 py-1.5 pl-9 pr-4 text-sm focus:border-[#5c3d2e] focus:outline-none transition"
             />
           </div>
-          <select
+
+          <RoleDropdown
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="rounded-lg border border-slate-200 py-1.5 px-3 text-sm focus:border-[#5c3d2e] focus:outline-none bg-white transition"
-          >
-            <option value="ALL">Todos los roles</option>
-            <option value={Role.ADMIN}>Admin</option>
-            <option value={Role.CLIENT}>Cliente</option>
-          </select>
+            onChange={(val) => setRoleFilter(val)}
+          />
         </motion.div>
 
-        {/* Tabla Animada */}
+        {/* Tabla Animada (Sin columna ID) */}
         {loading ? (
           <div className="p-12 text-center text-slate-500 animate-pulse">
             Cargando usuarios...
@@ -204,7 +201,6 @@ export const Users = () => {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50/60 text-xs font-semibold uppercase text-slate-500 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-3.5">ID</th>
                   <th className="px-6 py-3.5">Nombre</th>
                   <th className="px-6 py-3.5">Correo</th>
                   <th className="px-6 py-3.5">Rol</th>
@@ -226,9 +222,6 @@ export const Users = () => {
                       }}
                       className="hover:bg-slate-50/60 transition-colors"
                     >
-                      <td className="px-6 py-3 font-medium text-slate-900">
-                        {idx + 1}
-                      </td>
                       <td className="px-6 py-3 font-semibold text-slate-900">
                         {user.name}
                       </td>
