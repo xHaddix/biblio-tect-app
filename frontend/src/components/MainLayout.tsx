@@ -9,7 +9,9 @@ import {
   ChevronLeft,
   Menu,
   Store,
+  Loader2,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -21,6 +23,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     return localStorage.getItem('sidebar_collapsed') === 'true';
   });
 
+  // Estado para la animación de cierre de sesión
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   const navigate = useNavigate();
 
   // Guardamos cada cambio en localStorage
@@ -29,10 +34,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   }, [isCollapsed]);
 
   const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('user');
-    localStorage.removeItem('auth-storage');
-    void navigate('/login');
+    // Inicia el estado de animación
+    setIsLoggingOut(true);
+
+    // Retraso para ver la transición suave antes de redirigir
+    setTimeout(() => {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('auth-storage');
+      void navigate('/login');
+    }, 1200);
   };
 
   // Detección dinámica del rol del usuario actual
@@ -70,7 +81,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       ];
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-slate-50 relative overflow-hidden">
       {/* Sidebar Deslizable */}
       <aside
         className={`relative flex flex-col justify-between bg-brand-dark text-white p-4 transition-all duration-300 ease-in-out ${
@@ -80,7 +91,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         {/* Botón Flotante para Colapsar/Expandir */}
         <button
           onClick={() => setIsCollapsed((prev) => !prev)}
-          className="absolute -right-3.5 top-7 z-50 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-brand-dark text-white shadow-md transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+          className="absolute -right-3.5 top-7 z-40 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-brand-dark text-white shadow-md transition-transform hover:scale-110 active:scale-95 cursor-pointer"
           aria-label={isCollapsed ? 'Expandir barra' : 'Colapsar barra'}
         >
           {isCollapsed ? (
@@ -136,7 +147,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <div className="border-t border-white/10 pt-4">
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-3.5 rounded-xl px-3.5 py-3 text-sm font-medium text-rose-300 transition-colors hover:bg-rose-500/10 hover:text-rose-200 cursor-pointer"
+            disabled={isLoggingOut}
+            className="flex w-full items-center gap-3.5 rounded-xl px-3.5 py-3 text-sm font-medium text-rose-300 transition-colors hover:bg-rose-500/10 hover:text-rose-200 cursor-pointer disabled:opacity-50"
             title={isCollapsed ? 'Cerrar sesión' : undefined}
           >
             <LogOut className="h-5 w-5 shrink-0" />
@@ -153,6 +165,48 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       <main className="flex-1 overflow-y-auto p-8 transition-all duration-300">
         {children}
       </main>
+
+      {/* Overlay Animado al Cerrar Sesión */}
+      <AnimatePresence>
+        {isLoggingOut && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-brand-dark/95 backdrop-blur-md text-white"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="flex flex-col items-center gap-4 p-8 rounded-3xl bg-white/5 border border-white/10 text-center shadow-2xl max-w-sm w-full mx-4"
+            >
+              <div className="relative flex items-center justify-center">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}
+                  className="absolute -inset-2 rounded-2xl bg-brand-accent/20 blur-sm"
+                />
+                <div className="relative rounded-2xl bg-brand-accent p-4 text-white shadow-lg">
+                  <BookOpen className="h-8 w-8" />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="text-xl font-bold tracking-tight text-white">
+                  Cerrando sesión
+                </h3>
+                <p className="text-xs text-slate-300">
+                  Guardando cambios... ¡Hasta pronto!
+                </p>
+              </div>
+
+              <Loader2 className="h-6 w-6 animate-spin text-brand-accent mt-2" />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
